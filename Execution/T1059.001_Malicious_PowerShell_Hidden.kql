@@ -1,0 +1,24 @@
+// MITRE ATT&CK: T1059.001 - Command and Scripting Interpreter: PowerShell
+// Description: Detects PowerShell execution utilizing hidden window styles or base64 encoded commands via Sysmon process creation logs.
+// Author: Detection Engineering
+// Data Source: Sysmon (Event ID 1)
+
+Event
+| where TimeGenerated > ago(24h)
+| where Source == "Microsoft-Windows-Sysmon" and EventID == 1
+| extend ProcessCommandLine = tostring(EventData.CommandLine),
+         Image = tostring(EventData.Image),
+         ParentImage = tostring(EventData.ParentImage),
+         User = tostring(EventData.User),
+         Hashes = tostring(EventData.Hashes)
+// Target PowerShell binaries (handles renamed execution via image path)
+| where Image has_any ("powershell.exe", "pwsh.exe")
+// Filter for stealth flags: Hidden windows or Encoded commands
+| where ProcessCommandLine has_any (
+    "-windowstyle hidden", 
+    "-w hidden", 
+    "-encodedcommand", 
+    "-enc"
+)
+| project TimeGenerated, Computer, User, ParentImage, Image, ProcessCommandLine, Hashes
+| sort by TimeGenerated desc
